@@ -1,0 +1,18 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+object StringToLocalDateTime {
+  def main(args: Array[String]): Unit = {
+    // The input string representing a date and time
+    val dateTimeString = "2023-10-30T15:30:00"
+
+    // Define a DateTimeFormatter to specify the pattern of your input string
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
+
+    // Parse the string to a LocalDateTime
+    val localDateTime = LocalDateTime.parse(dateTimeString, formatter)
+
+    // Print the LocalDateTime
+    println("Parsed LocalDateTime: " + localDateTime)
+  }
+}
