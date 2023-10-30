@@ -1,110 +1,40 @@
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
-import org.apache.flink.api.common.state.MapState;
-import org.apache.flink.api.common.state.MapStateDescriptor;
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.util.Collector;
+import org.apache.flink.api.common.state.MapState
+import org.apache.flink.api.common.state.MapStateDescriptor
+import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.common.typeinfo.Types
+import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
+import org.apache.flink.util.Collector
 
-import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
 
-public class FlinkMapStateExample {
+o make multiple records from a MapState in Flink where the state contains a nested structure like Map<id, HashMap<deptid, UserDefinedClass>>, you need to iterate through the MapState, and for each id, iterate through the nested HashMap to create multiple records. You can use Scala to do this as follows:
 
-    public static void main(String[] args) throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+case class UserDefinedClass(name: String, age: Int)
 
-        DataStream<Tuple2<BigDecimal, HashMap<BigDecimal, UserDefinedSchema>>> inputDataStream = ...; // Create your input DataStream
+def main(args: Array[String]): Unit = {
+  val env = StreamExecutionEnvironment.getExecutionEnvironment
 
-        DataStream<Tuple2<BigDecimal, UserDefinedSchema>> resultStream = inputDataStream
-                .flatMap(new MapStateFunction())
-                .returns(Types.TUPLE(Types.BIG_DEC, TypeInformation.of(UserDefinedSchema.class)));
-
-        resultStream.print();
-
-        env.execute("Flink MapState Example");
+  val mapStateDescriptor = new MapStateDescriptor[String, Map[String, UserDefinedClass]](
+    "nestedMapState",
+    Types.STRING,
+    new TypeInformation[Map[String, UserDefinedClass]] {
+      // Implement appropriate methods to describe your nested Map type here
     }
+  )
 
-    public static class MapStateFunction extends RichFlatMapFunction<Tuple2<BigDecimal, HashMap<BigDecimal, UserDefinedSchema>>, Tuple2<BigDecimal, UserDefinedSchema>> {
-        private transient MapState<BigDecimal, UserDefinedSchema> mapState;
+  val mapState: MapState[String, Map[String, UserDefinedClass]] = getRuntimeContext.getMapState(mapStateDescriptor)
 
-        @Override
-        public void open(Configuration parameters) throws Exception {
-            MapStateDescriptor<BigDecimal, UserDefinedSchema> descriptor = new MapStateDescriptor<>(
-                    "mapState",
-                    BasicTypeInfo.BIG_DEC_TYPE_INFO, // Key type
-                    TypeInformation.of(UserDefinedSchema.class) // Value type
-            );
-            mapState = getRuntimeContext().getMapState(descriptor);
-        }
+  // Create a DataStream of your choice, where the KeyedStream represents the 'id' in the outer Map
+  // For this example, let's assume you have a DataStream keyed by 'id'
+  val input: DataStream[(String, Map[String, UserDefinedClass])] = ???
 
-        @Override
-        public void flatMap(Tuple2<BigDecimal, HashMap<BigDecimal, UserDefinedSchema>> input, Collector<Tuple2<BigDecimal, UserDefinedSchema>> out) throws Exception {
-            BigDecimal key1 = input.f0;
-            HashMap<BigDecimal, UserDefinedSchema> innerMap = input.f1;
-
-            // Flatten the inner map and assign to the outer key
-            for (Map.Entry<BigDecimal, UserDefinedSchema> entry : innerMap.entrySet()) {
-                BigDecimal key2 = entry.getKey();
-                UserDefinedSchema value = entry.getValue();
-
-                // Put the key-value pair into the MapState
-                mapState.put(key2, value);
-
-                // Emit the assigned data
-                out.collect(new Tuple2<>(key2, value));
-            }
-        }
-    }
-}
-
-
-
-object FlinkMapStateExample {
-
-  def main(args: Array[String]): Unit = {
-    val env = StreamExecutionEnvironment.getExecutionEnvironment
-
-    val inputDataStream: DataStream[(BigDecimal, MutableMap[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]])] = ...
-
-    val resultStream: DataStream[(BigDecimal, UserDefinedSchema)] = inputDataStream
-      .flatMap(new MapStateFunction())
-    
-    resultStream.print()
-
-    env.execute("Flink MapState Example")
-  }
-
-  class MapStateFunction extends RichFlatMapFunction[(BigDecimal, MutableMap[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]]), (BigDecimal, UserDefinedSchema)] {
-    private var mapState: MapState[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]] = _
-
-    override def open(parameters: Configuration): Unit = {
-      val descriptor = new MapStateDescriptor[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]](
-        "mapState",
-        createTypeInformation[BigDecimal], // Key type
-        createTypeInformation[MutableMap[BigDecimal, UserDefinedSchema]] // Value type
-      )
-      mapState = getRuntimeContext.getMapState(descriptor)
-    }
-
-    override def flatMap(input: (BigDecimal, MutableMap[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]]), out: Collector[(BigDecimal, UserDefinedSchema)]): Unit = {
-      val key1 = input._1
-      val nestedMap = input._2
-
-      // Iterate over the nested map and process its content
-      for ((key2, innerMap) <- nestedMap) {
-        // Flatten the inner map and assign it to the outer key
-        for ((key3, value) <- innerMap) {
-          // Put the key-value pair into the MapState
-          mapState.put(key3, value)
-
-          // Emit the assigned data
-          out.collect((key3, value))
-        }
+  val result: DataStream[UserDefinedClass] = input.flatMap {
+    (id: String, nestedMap: Map[String, UserDefinedClass], out: Collector[UserDefinedClass]) =>
+      nestedMap.values.foreach { userDefinedClass =>
+        out.collect(userDefinedClass)
       }
-    }
   }
-}
 
+  result.print()
+
+  env.execute("Extract UserDefinedClass from MapState")
+}
