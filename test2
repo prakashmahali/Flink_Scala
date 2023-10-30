@@ -59,3 +59,52 @@ public class FlinkMapStateExample {
         }
     }
 }
+
+
+
+object FlinkMapStateExample {
+
+  def main(args: Array[String]): Unit = {
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    val inputDataStream: DataStream[(BigDecimal, MutableMap[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]])] = ...
+
+    val resultStream: DataStream[(BigDecimal, UserDefinedSchema)] = inputDataStream
+      .flatMap(new MapStateFunction())
+    
+    resultStream.print()
+
+    env.execute("Flink MapState Example")
+  }
+
+  class MapStateFunction extends RichFlatMapFunction[(BigDecimal, MutableMap[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]]), (BigDecimal, UserDefinedSchema)] {
+    private var mapState: MapState[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]] = _
+
+    override def open(parameters: Configuration): Unit = {
+      val descriptor = new MapStateDescriptor[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]](
+        "mapState",
+        createTypeInformation[BigDecimal], // Key type
+        createTypeInformation[MutableMap[BigDecimal, UserDefinedSchema]] // Value type
+      )
+      mapState = getRuntimeContext.getMapState(descriptor)
+    }
+
+    override def flatMap(input: (BigDecimal, MutableMap[BigDecimal, MutableMap[BigDecimal, UserDefinedSchema]]), out: Collector[(BigDecimal, UserDefinedSchema)]): Unit = {
+      val key1 = input._1
+      val nestedMap = input._2
+
+      // Iterate over the nested map and process its content
+      for ((key2, innerMap) <- nestedMap) {
+        // Flatten the inner map and assign it to the outer key
+        for ((key3, value) <- innerMap) {
+          // Put the key-value pair into the MapState
+          mapState.put(key3, value)
+
+          // Emit the assigned data
+          out.collect((key3, value))
+        }
+      }
+    }
+  }
+}
+
