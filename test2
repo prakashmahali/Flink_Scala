@@ -1,0 +1,61 @@
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
+import org.apache.flink.api.common.state.MapState;
+import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.util.Collector;
+
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+
+public class FlinkMapStateExample {
+
+    public static void main(String[] args) throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+        DataStream<Tuple2<BigDecimal, HashMap<BigDecimal, UserDefinedSchema>>> inputDataStream = ...; // Create your input DataStream
+
+        DataStream<Tuple2<BigDecimal, UserDefinedSchema>> resultStream = inputDataStream
+                .flatMap(new MapStateFunction())
+                .returns(Types.TUPLE(Types.BIG_DEC, TypeInformation.of(UserDefinedSchema.class)));
+
+        resultStream.print();
+
+        env.execute("Flink MapState Example");
+    }
+
+    public static class MapStateFunction extends RichFlatMapFunction<Tuple2<BigDecimal, HashMap<BigDecimal, UserDefinedSchema>>, Tuple2<BigDecimal, UserDefinedSchema>> {
+        private transient MapState<BigDecimal, UserDefinedSchema> mapState;
+
+        @Override
+        public void open(Configuration parameters) throws Exception {
+            MapStateDescriptor<BigDecimal, UserDefinedSchema> descriptor = new MapStateDescriptor<>(
+                    "mapState",
+                    BasicTypeInfo.BIG_DEC_TYPE_INFO, // Key type
+                    TypeInformation.of(UserDefinedSchema.class) // Value type
+            );
+            mapState = getRuntimeContext().getMapState(descriptor);
+        }
+
+        @Override
+        public void flatMap(Tuple2<BigDecimal, HashMap<BigDecimal, UserDefinedSchema>> input, Collector<Tuple2<BigDecimal, UserDefinedSchema>> out) throws Exception {
+            BigDecimal key1 = input.f0;
+            HashMap<BigDecimal, UserDefinedSchema> innerMap = input.f1;
+
+            // Flatten the inner map and assign to the outer key
+            for (Map.Entry<BigDecimal, UserDefinedSchema> entry : innerMap.entrySet()) {
+                BigDecimal key2 = entry.getKey();
+                UserDefinedSchema value = entry.getValue();
+
+                // Put the key-value pair into the MapState
+                mapState.put(key2, value);
+
+                // Emit the assigned data
+                out.collect(new Tuple2<>(key2, value));
+            }
+        }
+    }
+}
