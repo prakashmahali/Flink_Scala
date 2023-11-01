@@ -1,0 +1,84 @@
+import org.apache.flink.api.common.state.{MapState, MapStateDescriptor, ValueState, ValueStateDescriptor}
+import org.apache.flink.api.common.typeinfo.{TypeInformation, Types}
+import org.apache.flink.api.scala._
+import org.apache.flink.streaming.api.datastream.{DataStream, KeyedStream}
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
+import org.apache.flink.util.Collector
+import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction
+import org.apache.flink.util.Collector
+
+case class Student(schoolId: String, id: String, seq: Int, mesg: String)
+case class School(schoolId: String, schoolName: String, address: String)
+case class MergedData(schoolId: String, schoolName: String, address: String, studentId: String, combinedMessage: String)
+
+object MergeStudentAndSchool {
+  def main(args: Array[String]): Unit = {
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.setParallelism(1) // Set your desired parallelism
+
+    val studentStream: DataStream[Student] = env.fromElements(
+      Student("school1", "student1", 1, "Message1"),
+      Student("school1", "student1", 2, "Message2"),
+      Student("school2", "student2", 1, "Message3"),
+      Student("school1", "student3", 1, "Message4"),
+      Student("school2", "student4", 1, "Message5")
+    )
+
+    val schoolStream: DataStream[School] = env.fromElements(
+      School("school1", "SchoolA", "AddressA"),
+      School("school2", "SchoolB", "AddressB")
+    )
+
+    val mergedStream: DataStream[MergedData] = studentStream
+      .keyBy(student => (student.schoolId, student.id))
+      .connect(schoolStream.keyBy(_.schoolId))
+      .flatMap(new MergeStudentAndSchoolFunction)
+
+    mergedStream.print()
+
+    env.execute("MergeStudentAndSchoolExample")
+  }
+}
+
+class MergeStudentAndSchoolFunction extends RichCoFlatMapFunction[Student, School, MergedData] {
+  private var studentState: MapState[(String, String), Student] = _
+  private var schoolState: ValueState[School] = _
+
+  override def open(parameters: org.apache.flink.configuration.Configuration): Unit = {
+    val studentStateDescriptor = new MapStateDescriptor[(String, String), Student]("studentState",
+      Types.TUPLE[(String, String], classOf[Student]), Types.of[Student])
+    studentState = getRuntimeContext.getMapState(studentStateDescriptor)
+
+    val schoolStateDescriptor = new ValueStateDescriptor[School]("schoolState", Types.of[School])
+    schoolState = getRuntimeContext.getState(schoolStateDescriptor)
+  }
+
+  override def flatMap1(student: Student, out: Collector[MergedData]): Unit = {
+    // Process student messages
+    val schoolId = student.schoolId
+    val studentId = student.id
+    val seq = student.seq
+    val message = student.mesg
+
+    val existingStudent = studentState.get((schoolId, studentId))
+    if (existingStudent == null || existingStudent.seq < seq) {
+      studentState.put((schoolId, studentId), student)
+    }
+
+    out.collect(new MergedData(schoolId, "", "", studentId, message))
+  }
+
+  override def flatMap2(school: School, out: Collector[MergedData]): Unit = {
+    // Process school information
+    val schoolId = school.schoolId
+    schoolState.update(school)
+
+    val students = studentState.entries().asScala
+    for ((key, student) <- students) {
+      val studentId = key._2
+      val combinedMessage = students.filter(_._1._2 == studentId).map(_._2.mesg).mkString(", ")
+
+      out.collect(MergedData(schoolId, school.schoolName, school.address, studentId, combinedMessage))
+    }
+  }
+}
