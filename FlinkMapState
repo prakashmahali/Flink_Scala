@@ -1,0 +1,18 @@
+Create Flink Mapstate and its operation: 
+1: Create MapDescriptor and MapState 
+class MyKeyedFunction extends KeyedProcessFunction[KeyType, InputType, OutputType] {
+  private var mapState: MapState[KeyType, ValueType] = _
+
+  override def open(parameters: Configuration): Unit = {
+    val mapStateDescriptor = new MapStateDescriptor("myMapState", classOf[KeyType], classOf[ValueType])
+    mapState = getRuntimeContext.getMapState(mapStateDescriptor)
+  }
+}
+// Operation 
+2:
+To add or update a key-value pair in the MapState, you can use the put method:
+  mapState.put(key, value)
+3:To retrieve the value associated with a key from the MapState, you can use the get method:
+  val value = mapState.get(key)
+4:To remove a key and its associated value from the MapState, you can use the remove method:
+  mapState.remove(key)
