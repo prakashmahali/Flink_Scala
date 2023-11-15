@@ -1,0 +1,18 @@
+case class Person(NAME: String, Lname: String)
+
+def getFullName(person: Person): String = {
+  (person.NAME, person.Lname) match {
+    case ("prkash", "mahali") => "pkm"
+    case ("pratik", "mahali") => "pm"
+    case _ => "PKMM"
+  }
+}
+
+// Example usage:
+val person1 = Person("prkash", "mahali")
+val person2 = Person("pratik", "mahali")
+val person3 = Person("john", "doe")
+
+println(s"FullName 1: ${getFullName(person1)}") // Output: pkm
+println(s"FullName 2: ${getFullName(person2)}") // Output: pm
+println(s"FullName 3: ${getFullName(person3)}") // Output: PKMM
