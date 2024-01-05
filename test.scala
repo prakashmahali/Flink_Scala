@@ -1,52 +1,42 @@
-libraryDependencies += "com.typesafe.play" %% "play-json" % "2.10.4"
-import play.api.libs.json._
+import java.time.format.DateTimeFormatter
+import java.time.{LocalDateTime, ZonedDateTime}
+import scala.util.Try
 
-object JsonExample {
-  def jsonStringToJson(jsonString: String): JsValue = {
-    Json.parse(jsonString)
-  }
+object DateTimeUtils {
 
-  def main(args: Array[String]): Unit = {
-    val jsonString = """{"key": "value", "number": 42, "nested": {"innerKey": "innerValue"}}"""
+  def convertToStandardFormat(dateTimeString: String): Option[String] = {
+    val supportedFormats = List(
+      "yyyy-MM-dd HH:mm:ss",
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+      "yyyyMMddHHmmss"
+      // Add more formats as needed
+    )
 
-    val json: JsValue = jsonStringToJson(jsonString)
+    val formatter = supportedFormats.view.map(DateTimeFormatter.ofPattern)
 
-    // You can now work with the JSON object
-    val key = (json \ "key").as[String]
-    val number = (json \ "number").as[Int]
-    val innerValue = (json \ "nested" \ "innerKey").as[String]
+    val result = formatter.flatMap { fmt =>
+      Try {
+        var updatedDateTimeString = dateTimeString
+        if (!updatedDateTimeString.contains(":ss")) {
+          // If ":ss" is missing, add seconds as ":00"
+          updatedDateTimeString = updatedDateTimeString + ":00"
+        }
 
-    println(s"Key: $key")
-    println(s"Number: $number")
-    println(s"Inner Value: $innerValue")
-  }
-}
-
-
-import scala.util.parsing.json.JSON
-
-import scala.util.parsing.json.JSON
-
-object JsonParsingExample {
-
-  def jsonStringToJson(jsonString: String): Option[Any] = {
-    JSON.parseFull(jsonString)
-  }
-
-  def main(args: Array[String]): Unit = {
-    val jsonString = """{"key": "value", "number": 42, "nested": {"innerKey": "innerValue"}}"""
-
-    jsonStringToJson(jsonString) match {
-      case Some(json) =>
-        println("Parsed JSON:")
-        println(json)
-
-      case None =>
-        println("Failed to parse JSON.")
+        val parsedDateTime = LocalDateTime.parse(updatedDateTimeString, fmt)
+        Some(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(parsedDateTime))
+      }.toOption
     }
+
+    result.headOption
   }
-}
-libraryDependencies += "com.typesafe.play" %% "play-json" % "2.10.0"
-libraryDependencies += "io.circe" %% "circe-core" % "0.14.1"
 
+  def main(args: Array[String]): Unit = {
+    // Example usage
+    val dateTimeString1 = "2022-01-04 12:30:45"
+    val dateTimeString2 = "2022-01-04T12:30:45.123Z"
+    val dateTimeString3 = "2022-01-04T12:30:45+0100"
+    val dateTimeString4 = "202201041230"
 
+    val result1 = convertToStandardFormat(dateTimeString1)
+    val resul
