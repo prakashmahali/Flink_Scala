@@ -1,3 +1,5 @@
+libraryDependencies += "com.googlecode.json-simple" % "json-simple" % "1.1.1"
+
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse
 import scala.util.{Try, Success, Failure}
 
