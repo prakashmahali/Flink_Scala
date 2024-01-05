@@ -1,33 +1,23 @@
-libraryDependencies += "com.googlecode.json-simple" % "json-simple" % "1.1.1"
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.10.4"
+import play.api.libs.json._
 
-import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse
-import scala.util.{Try, Success, Failure}
-
-object AwsSecretsManagerExample {
-
-  def getUsernamePasswordFromSecret(response: GetSecretValueResponse): (String, String) = {
-    val secretString: String = response.secretString()
-
-    val username = Try(JsonParser(secretString).asJsObject.fields("username").convertTo[String]) match {
-      case Success(value) => value
-      case Failure(_) => ""
-    }
-
-    val password = Try(JsonParser(secretString).asJsObject.fields("password").convertTo[String]) match {
-      case Success(value) => value
-      case Failure(_) => ""
-    }
-
-    (username, password)
+object JsonExample {
+  def jsonStringToJson(jsonString: String): JsValue = {
+    Json.parse(jsonString)
   }
 
   def main(args: Array[String]): Unit = {
-    // Assuming you have the GetSecretValueResponse instance, replace this with your actual response.
-    val response: GetSecretValueResponse = ???
+    val jsonString = """{"key": "value", "number": 42, "nested": {"innerKey": "innerValue"}}"""
 
-    val (username, password) = getUsernamePasswordFromSecret(response)
+    val json: JsValue = jsonStringToJson(jsonString)
 
-    println(s"Username: $username")
-    println(s"Password: $password")
+    // You can now work with the JSON object
+    val key = (json \ "key").as[String]
+    val number = (json \ "number").as[Int]
+    val innerValue = (json \ "nested" \ "innerKey").as[String]
+
+    println(s"Key: $key")
+    println(s"Number: $number")
+    println(s"Inner Value: $innerValue")
   }
 }
