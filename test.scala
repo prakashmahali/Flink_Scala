@@ -46,4 +46,7 @@ object JsonParsingExample {
     }
   }
 }
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.10.0"
+libraryDependencies += "io.circe" %% "circe-core" % "0.14.1"
+
 
