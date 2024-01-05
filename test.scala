@@ -21,3 +21,29 @@ object JsonExample {
     println(s"Inner Value: $innerValue")
   }
 }
+
+
+import scala.util.parsing.json.JSON
+
+import scala.util.parsing.json.JSON
+
+object JsonParsingExample {
+
+  def jsonStringToJson(jsonString: String): Option[Any] = {
+    JSON.parseFull(jsonString)
+  }
+
+  def main(args: Array[String]): Unit = {
+    val jsonString = """{"key": "value", "number": 42, "nested": {"innerKey": "innerValue"}}"""
+
+    jsonStringToJson(jsonString) match {
+      case Some(json) =>
+        println("Parsed JSON:")
+        println(json)
+
+      case None =>
+        println("Failed to parse JSON.")
+    }
+  }
+}
+
