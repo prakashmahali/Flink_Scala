@@ -1,50 +1,31 @@
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
-import org.apache.flink.api.common.state.MapState;
-import org.apache.flink.api.common.state.MapStateDescriptor;
-import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.util.Collector;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse
+import scala.util.{Try, Success, Failure}
 
-public class MyMapStateFunction extends RichFlatMapFunction<Tuple2<String, SomeClass>, Tuple2<String, SomeClass>> {
-    private transient MapState<String, SomeClass> mapState;
+object AwsSecretsManagerExample {
 
-    @Override
-    public void open(Configuration parameters) throws Exception {
-        MapStateDescriptor<String, SomeClass> descriptor = new MapStateDescriptor<>(
-                "mapState",
-                BasicTypeInfo.STRING_TYPE_INFO, // Key type
-                TypeInformation.of(SomeClass.class) // Value type
-        );
-        mapState = getRuntimeContext().getMapState(descriptor);
+  def getUsernamePasswordFromSecret(response: GetSecretValueResponse): (String, String) = {
+    val secretString: String = response.secretString()
+
+    val username = Try(JsonParser(secretString).asJsObject.fields("username").convertTo[String]) match {
+      case Success(value) => value
+      case Failure(_) => ""
     }
 
-    @Override
-    public void flatMap(Tuple2<String, SomeClass> input, Collector<Tuple2<String, SomeClass>> out) throws Exception {
-        String key = input.f0;
-        SomeClass value = input.f1;
-
-        // Put the key-value pair into the MapState
-        mapState.put(key, value);
-
-        // Process and emit your data here if needed
-        out.collect(input);
+    val password = Try(JsonParser(secretString).asJsObject.fields("password").convertTo[String]) match {
+      case Success(value) => value
+      case Failure(_) => ""
     }
-}
 
-public static void main(String[] args) throws Exception {
-    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+    (username, password)
+  }
 
-    DataStream<Tuple2<String, SomeClass>> inputDataStream = ...; // Create your input DataStream
+  def main(args: Array[String]): Unit = {
+    // Assuming you have the GetSecretValueResponse instance, replace this with your actual response.
+    val response: GetSecretValueResponse = ???
 
-    KeyedStream<Tuple2<String, SomeClass>, String> keyedStream = inputDataStream
-        .keyBy((KeySelector<Tuple2<String, SomeClass>, String>) value -> value.f0);
+    val (username, password) = getUsernamePasswordFromSecret(response)
 
-    DataStream<Tuple2<String, SomeClass>> resultStream = keyedStream
-        .flatMap(new MyMapStateFunction())
-        .returns(Types.TUPLE(Types.STRING, TypeInformation.of(SomeClass.class)));
-
-    resultStream.print();
-
-    env.execute("Flink MapState Example");
+    println(s"Username: $username")
+    println(s"Password: $password")
+  }
 }
