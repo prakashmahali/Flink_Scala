@@ -1,0 +1,52 @@
+import org.apache.flink.api.common.state.{MapState, MapStateDescriptor}
+import org.apache.flink.api.scala._
+import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
+import org.apache.flink.util.Collector
+
+// Define your case class
+case class UserClass(name: String, age: Int)
+
+object FlinkMapStateExample {
+  def main(args: Array[String]): Unit = {
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    // Create a data stream with records to add to MapState
+    val dataStream: DataStream[(Int, Int, UserClass)] = env.fromElements(
+      (101, 1, UserClass("Alice", 30)),
+      (101, 2, UserClass("Bob", 35)),
+      (102, 1, UserClass("Charlie", 25))
+    )
+
+    // Define the MapStateDescriptor
+    val mapStateDescriptor = new MapStateDescriptor[Int, Map[Int, UserClass]](
+      "userMapState",
+      classOf[Int], // Key type
+      classOf[Map[Int, UserClass]] // Value type
+    )
+
+    // Create a KeyedStream from the data stream
+    val keyedStream = dataStream.keyBy(_._1)
+
+    // Process the data stream to update MapState
+    val resultStream = keyedStream
+      .process((value: (Int, Int, UserClass), ctx: KeyedProcessFunction[Int, (Int, Int, UserClass), Unit]#Context, out: Collector[Unit]) => {
+        // Access the MapState for the current key
+        val userMapState: MapState[Int, Map[Int, UserClass]] = ctx.getMapState(mapStateDescriptor)
+
+        // Get or create the map for the current comment_code
+        val userMap = Option(userMapState.get(value._2)).getOrElse(Map.empty[Int, UserClass])
+
+        // Update the map with the new user class
+        val updatedUserMap = userMap + (value._2 -> value._3)
+
+        // Update the MapState with the modified map
+        userMapState.put(value._2, updatedUserMap)
+      })
+
+    // Print the result stream
+    resultStream.print()
+
+    // Execute the job
+    env.execute("Flink MapState Example")
+  }
+}
