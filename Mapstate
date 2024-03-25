@@ -1,0 +1,33 @@
+import org.apache.flink.api.common.state.{MapState, MapStateDescriptor}
+import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction
+import org.apache.flink.util.Collector
+
+case class UserClass(name: String, age: Int)
+
+class UpdateMapStateFunction extends RichCoFlatMapFunction[(Int, UserClass), (Int, UserClass), (Int, Map[Int, UserClass])] {
+
+  private var userMapState: MapState[Int, Map[Int, UserClass]] = _
+
+  override def open(parameters: org.apache.flink.configuration.Configuration): Unit = {
+    val mapStateDescriptor = new MapStateDescriptor[Int, Map[Int, UserClass]](
+      "userMapState",
+      classOf[Int],
+      classOf[Map[Int, UserClass]]
+    )
+    userMapState = getRuntimeContext.getMapState(mapStateDescriptor)
+  }
+
+  override def flatMap1(value: (Int, UserClass), out: Collector[(Int, Map[Int, UserClass])]): Unit = {
+    val userMap = Option(userMapState.get(value._1)).getOrElse(Map.empty[Int, UserClass])
+    val updatedUserMap = userMap + (value._2.age -> value._2)
+    userMapState.put(value._1, updatedUserMap)
+    out.collect((value._1, updatedUserMap))
+  }
+
+  override def flatMap2(value: (Int, UserClass), out: Collector[(Int, Map[Int, UserClass])]): Unit = {
+    val userMap = Option(userMapState.get(value._1)).getOrElse(Map.empty[Int, UserClass])
+    val updatedUserMap = userMap + (value._2.age -> value._2)
+    userMapState.put(value._1, updatedUserMap)
+    out.collect((value._1, updatedUserMap))
+  }
+}
