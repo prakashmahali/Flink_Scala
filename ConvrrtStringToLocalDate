@@ -20,3 +20,4 @@ implicit val ordering: Ordering[(LocalDateTime, String)] = Ordering.Tuple2(
     Ordering[LocalDateTime].reverse,  // Descending order for LocalDateTime
     Ordering[String].reverse          // Descending order for String
   )
+implicit val localDateTimeOrdering: Ordering[LocalDateTime] = Ordering.fromLessThan(_ isBefore _)
