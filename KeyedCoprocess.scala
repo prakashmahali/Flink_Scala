@@ -3,6 +3,48 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
 import org.apache.flink.util.Collector;
 
+
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
+import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
+import org.apache.flink.util.Collector;
+
+public static class OrderShipmentCoProcessFunction extends KeyedCoProcessFunction<String, Order, Shipment, String> {
+
+    private ValueState<Order> orderState;
+    private ValueState<Shipment> shipmentState;
+
+    @Override
+    public void open(Configuration parameters) {
+        orderState = getRuntimeContext().getState(new ValueStateDescriptor<>("saved-order", Types.POJO(Order.class)));
+        shipmentState = getRuntimeContext().getState(new ValueStateDescriptor<>("saved-shipment", Types.POJO(Shipment.class)));
+    }
+
+    @Override
+    public void processElement1(Order order, Context ctx, Collector<String> out) throws Exception {
+        Shipment shipment = shipmentState.value();
+        if (shipment != null) {
+            out.collect("Order: " + order + " matched with Shipment: " + shipment);
+            shipmentState.clear();
+        } else {
+            orderState.update(order);
+        }
+    }
+
+    @Override
+    public void processElement2(Shipment shipment, Context ctx, Collector<String> out) throws Exception {
+        Order order = orderState.value();
+        if (order != null) {
+            out.collect("Order: " + order + " matched with Shipment: " + shipment);
+            orderState.clear();
+        } else {
+            shipmentState.update(shipment);
+        }
+    }
+}
+
 public class OrderPaymentMatchFunction extends KeyedCoProcessFunction<String, OrderEvent, PaymentEvent, String> {
 
     private ValueState<OrderEvent> orderState;
