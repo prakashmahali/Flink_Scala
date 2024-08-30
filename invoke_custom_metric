@@ -1,0 +1,68 @@
+
+
+package org.ap.metrics
+
+import org.apache.flink.api.common.functions.RichFunction
+import org.apache.flink.api.common.accumulators.LongCounter
+import org.apache.flink.configuration.Configuration
+
+class CustomerMetrics extends RichFunction {
+  @transient var counter: LongCounter = _
+
+  // Initialize the counter
+  def initCounter(): Unit = {
+    counter = getRuntimeContext.getLongCounter("customCounter")
+  }
+
+  // Increment the counter
+  def incrementCounter(): Unit = {
+    counter.add(1)
+  }
+
+  // Get the current counter value (optional)
+  def getCounterValue: Long = {
+    counter.getLocalValue
+  }
+
+  override def open(parameters: Configuration): Unit = {
+    initCounter()
+  }
+
+  override def close(): Unit = {
+    // Optional: Cleanup or final operations
+  }
+}
+
+
+package org.sp.flink
+
+import org.apache.flink.streaming.api.scala._
+import org.ap.metrics.CustomerMetrics // Import the custom metrics class
+
+object FlinkMain {
+  def main(args: Array[String]): Unit = {
+    // Set up the execution environment
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    // Create an instance of CustomerMetrics
+    val customMetrics = new CustomerMetrics
+
+    // Sample data stream
+    val dataStream: DataStream[String] = env.fromElements("apple", "banana", "cherry", "date")
+
+    // Apply a map operation and use the custom metrics
+    val resultStream = dataStream.map(value => {
+      // Increment the custom counter for each processed element
+      customMetrics.incrementCounter()
+
+      // Process the element (for demonstration purposes, just return the value)
+      value
+    })
+
+    // Print the result stream
+    resultStream.print()
+
+    // Execute the Flink job
+    env.execute("Flink Custom Metrics Example")
+  }
+}
