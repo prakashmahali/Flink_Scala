@@ -55,6 +55,32 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
+import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
+
+public class MarketIdCountMapFunction extends RichMapFunction<Long, Long> {
+
+    private transient Counter marketIdCounter;
+
+    @Override
+    public void open(Configuration parameters) throws Exception {
+        // Register a Flink counter
+        marketIdCounter = getRuntimeContext().getMetricGroup().counter("marketIdCounter");
+    }
+
+    @Override
+    public Long map(Long count) throws Exception {
+        // Increment the Flink counter with the count value
+        marketIdCounter.inc(count);
+        return count;
+    }
+}
 
 public class MarketIdCountJob {
 
