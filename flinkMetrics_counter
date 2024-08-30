@@ -1,0 +1,51 @@
+import org.apache.flink.api.common.functions.RichMapFunction
+import org.apache.flink.api.common.accumulators.LongCounter
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
+
+// Define input and output classes
+case class MyInput(id: Int, name: String)
+case class MyOutput(id: Int, processedName: String)
+
+object FlinkCustomCounterExample {
+  def main(args: Array[String]): Unit = {
+    // Set up the execution environment
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    // Create a DataStream of MyInput elements
+    val inputStream: DataStream[MyInput] = env.fromElements(
+      MyInput(1, "Alice"),
+      MyInput(2, "Bob"),
+      MyInput(3, "Charlie")
+    )
+
+    // Apply a RichMapFunction that includes a custom counter
+    val resultStream: DataStream[MyOutput] = inputStream.map(new RichMapFunction[MyInput, MyOutput] {
+
+      // Declare a counter
+      @transient private var counter: LongCounter = _
+
+      // Open method to initialize the counter
+      override def open(parameters: Configuration): Unit = {
+        // Initialize the counter in the open method
+        counter = getRuntimeContext.getLongCounter("processedElementsCounter")
+      }
+
+      // Map method where the actual processing happens
+      override def map(input: MyInput): MyOutput = {
+        // Increment the counter
+        counter.add(1)
+
+        // Process the input and return the output
+        MyOutput(input.id, s"Processed: ${input.name}")
+      }
+    })
+
+    // Print the result stream
+    resultStream.print()
+
+    // Execute the Flink job
+    env.execute("Flink Custom Counter Example")
+  }
+}
