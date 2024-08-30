@@ -1,0 +1,55 @@
+import org.apache.flink.api.common.functions.RichMapFunction
+import org.apache.flink.api.common.functions.RichFlatMapFunction
+import org.apache.flink.streaming.api.scala._
+import org.apache.flink.api.common.accumulators.LongCounter
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.metrics.Gauge
+import org.apache.flink.util.Collector
+
+object FlinkCustomMetricsExample {
+
+  def main(args: Array[String]): Unit = {
+    // Set up the execution environment
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    // Sample data stream
+    val dataStream: DataStream[String] = env.fromElements("apple", "banana", "cherry", "date", "elderberry")
+
+    // Apply a map operation and add custom metrics
+    val resultStream = dataStream.map(new RichMapFunction[String, String] {
+
+      // Declare a counter metric
+      private var counter: LongCounter = _
+      
+      // Declare a gauge metric
+      private var stringLengthGauge: Int = _
+
+      override def open(parameters: Configuration): Unit = {
+        // Initialize the counter
+        counter = getRuntimeContext.getLongCounter("myCounter")
+
+        // Initialize the gauge
+        getRuntimeContext.getMetricGroup.gauge[Int, Gauge[Int]]("stringLengthGauge", new Gauge[Int] {
+          override def getValue: Int = stringLengthGauge
+        })
+      }
+
+      override def map(value: String): String = {
+        // Increment the counter
+        counter.add(1)
+
+        // Set the gauge value (e.g., the length of the string)
+        stringLengthGauge = value.length
+
+        // Process and return the value (for demonstration purposes, just return the value)
+        value
+      }
+    })
+
+    // Print the result stream
+    resultStream.print()
+
+    // Execute the Flink job
+    env.execute("Flink Custom Metrics Example")
+  }
+}
